@@ -1,4 +1,3 @@
-
 import os
 import sys
 import yaml
@@ -6,7 +5,8 @@ import torch
 import pprint
 from munch import munchify
 from models import VisModelingModel
-from pytorch_lightning.plugins import DDPPlugin
+from pytorch_lightning.strategies import DDPStrategy
+# from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -34,10 +34,13 @@ def main():
     seed(cfg)
     seed_everything(cfg.seed)
 
+    torch.set_float32_matmul_precision('medium')
+
     log_dir = '_'.join([cfg.log_dir,
                         cfg.model_name,
                         cfg.tag,
                         str(cfg.seed)])
+    print(log_dir)
 
     model = VisModelingModel(lr=cfg.lr,
                              seed=cfg.seed,
@@ -57,12 +60,13 @@ def main():
                              lr_schedule=cfg.lr_schedule)
 
     # define trainer
-    trainer = Trainer(gpus=cfg.num_gpus,
-                      max_epochs=cfg.epochs,
-                      deterministic=True,
-                      plugins=DDPPlugin(find_unused_parameters=False),
-                      amp_backend='native',
-                      default_root_dir=log_dir)
+    trainer = Trainer(accelerator="gpu",
+                     devices=cfg.num_gpus,
+                     max_epochs=cfg.epochs,
+                     deterministic=True,
+                     strategy=DDPStrategy(find_unused_parameters=False),
+                     precision="16-mixed",
+                     default_root_dir=log_dir)
 
     trainer.fit(model)
 
@@ -105,14 +109,15 @@ def main_kinematic():
         prefix='')
     
     # define trainer
-    trainer = Trainer(gpus=cfg.num_gpus,
-                      max_epochs=cfg.epochs,
-                      deterministic=True,
-                      plugins=DDPPlugin(find_unused_parameters=False),
-                      amp_backend='native',
-                      default_root_dir=log_dir,
-                      val_check_interval=1.0,
-                      checkpoint_callback=checkpoint_callback)
+    trainer = Trainer(accelerator="gpu",
+                     devices=cfg.num_gpus,
+                     max_epochs=cfg.epochs,
+                     deterministic=True,
+                     strategy=DDPStrategy(find_unused_parameters=False),
+                     precision="16-mixed",
+                     default_root_dir=log_dir,
+                     val_check_interval=1.0,
+                     callbacks=[checkpoint_callback])
 
     model.extract_kinematic_encoder_model(sys.argv[3])
     trainer.fit(model)
@@ -124,6 +129,8 @@ def main_kinematic_scratch():
     cfg = munchify(cfg)
     seed(cfg)
     seed_everything(cfg.seed)
+
+    torch.set_float32_matmul_precision('medium')
 
     log_dir = '_'.join([cfg.log_dir,
                         cfg.model_name,
@@ -156,14 +163,15 @@ def main_kinematic_scratch():
         prefix='')
     
     # define trainer
-    trainer = Trainer(gpus=cfg.num_gpus,
-                      max_epochs=cfg.epochs,
-                      deterministic=True,
-                      plugins=DDPPlugin(find_unused_parameters=False),
-                      amp_backend='native',
-                      default_root_dir=log_dir,
-                      val_check_interval=1.0,
-                      checkpoint_callback=checkpoint_callback)
+    trainer = Trainer(accelerator="gpu",
+                     devices=cfg.num_gpus,
+                     max_epochs=cfg.epochs,
+                     deterministic=True,
+                     strategy=DDPStrategy(find_unused_parameters=False),
+                     precision="16-mixed",
+                     default_root_dir=log_dir,
+                     val_check_interval=1.0,
+                     callbacks=[checkpoint_callback])
                       
     trainer.fit(model)
 
